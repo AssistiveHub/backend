@@ -33,6 +33,15 @@ public class NotionIntegration {
     @Column(name = "owner_user_id")
     private String ownerUserId;
 
+    @Column(name = "owner_id")
+    private String ownerId;
+
+    @Column(name = "owner_name")
+    private String ownerName;
+
+    @Column(name = "owner_email")
+    private String ownerEmail;
+
     @Column(name = "duplicated_template_id")
     private String duplicatedTemplateId;
 
@@ -61,6 +70,18 @@ public class NotionIntegration {
 
     @Column(name = "template_auto_apply")
     private Boolean templateAutoApply = false;
+
+    @Column(name = "sync_databases")
+    private Boolean syncDatabases = true;
+
+    @Column(name = "sync_pages")
+    private Boolean syncPages = true;
+
+    @Column(name = "sync_blocks")
+    private Boolean syncBlocks = false;
+
+    @Column(name = "bidirectional_sync")
+    private Boolean bidirectionalSync = false;
 
     @Column(name = "last_sync_at")
     private LocalDateTime lastSyncAt;
@@ -241,5 +262,61 @@ public class NotionIntegration {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getOwnerId() {
+        return ownerId;
+    }
+
+    public void setOwnerId(String ownerId) {
+        this.ownerId = ownerId;
+    }
+
+    public String getOwnerName() {
+        return ownerName;
+    }
+
+    public void setOwnerName(String ownerName) {
+        this.ownerName = ownerName;
+    }
+
+    public String getOwnerEmail() {
+        return ownerEmail;
+    }
+
+    public void setOwnerEmail(String ownerEmail) {
+        this.ownerEmail = ownerEmail;
+    }
+
+    public Boolean getSyncDatabases() {
+        return syncDatabases;
+    }
+
+    public void setSyncDatabases(Boolean syncDatabases) {
+        this.syncDatabases = syncDatabases;
+    }
+
+    public Boolean getSyncPages() {
+        return syncPages;
+    }
+
+    public void setSyncPages(Boolean syncPages) {
+        this.syncPages = syncPages;
+    }
+
+    public Boolean getSyncBlocks() {
+        return syncBlocks;
+    }
+
+    public void setSyncBlocks(Boolean syncBlocks) {
+        this.syncBlocks = syncBlocks;
+    }
+
+    public Boolean getBidirectionalSync() {
+        return bidirectionalSync;
+    }
+
+    public void setBidirectionalSync(Boolean bidirectionalSync) {
+        this.bidirectionalSync = bidirectionalSync;
     }
 }

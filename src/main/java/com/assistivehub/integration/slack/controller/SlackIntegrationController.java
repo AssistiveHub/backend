@@ -3,9 +3,11 @@ package com.assistivehub.integration.slack.controller;
 import com.assistivehub.integration.slack.dto.SlackIntegrationRequest;
 import com.assistivehub.integration.slack.dto.SlackIntegrationResponse;
 import com.assistivehub.integration.slack.dto.SlackManualSetupRequest;
-import com.assistivehub.entity.User;
 import com.assistivehub.integration.slack.service.SlackIntegrationService;
 import com.assistivehub.integration.slack.service.SlackManualSetupService;
+import com.assistivehub.integration.slack.service.SlackOAuthService;
+import com.assistivehub.entity.SlackIntegration;
+import com.assistivehub.entity.User;
 import com.assistivehub.service.UserService;
 import com.assistivehub.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +31,9 @@ public class SlackIntegrationController {
 
     @Autowired
     private SlackManualSetupService slackManualSetupService;
+
+    @Autowired
+    private SlackOAuthService slackOAuthService;
 
     @Autowired
     private UserService userService;
@@ -64,10 +69,14 @@ public class SlackIntegrationController {
      * 슬랙 OAuth 인증 URL 생성
      */
     @GetMapping("/auth-url")
-    public ResponseEntity<Map<String, Object>> getSlackAuthUrl(HttpServletRequest httpRequest) {
+    public ResponseEntity<Map<String, Object>> getSlackAuthUrl(
+            @RequestParam(required = false) String state,
+            HttpServletRequest httpRequest) {
+
         try {
-            Long userId = getCurrentUserId(httpRequest);
-            String authUrl = slackIntegrationService.generateSlackAuthUrl(userId);
+            getCurrentUserId(httpRequest); // 인증 확인
+
+            String authUrl = slackOAuthService.generateAuthUrl(state);
 
             Map<String, Object> result = new HashMap<>();
             result.put("success", true);
@@ -90,17 +99,26 @@ public class SlackIntegrationController {
      */
     @PostMapping("/callback")
     public ResponseEntity<Map<String, Object>> handleSlackCallback(
-            @Valid @RequestBody SlackIntegrationRequest request,
+            @RequestBody Map<String, String> callbackData,
             HttpServletRequest httpRequest) {
 
         try {
             Long userId = getCurrentUserId(httpRequest);
-            SlackIntegrationResponse integration = slackIntegrationService
-                    .handleSlackCallback(userId, request.getCode(), request.getRedirectUri());
+            User user = userService.findById(userId);
+
+            String code = callbackData.get("code");
+            String redirectUri = callbackData.get("redirect_uri");
+
+            if (code == null || code.trim().isEmpty()) {
+                throw new RuntimeException("인증 코드가 필요합니다.");
+            }
+
+            SlackIntegration integration = slackOAuthService
+                    .exchangeCodeForToken(user, code, redirectUri);
 
             Map<String, Object> result = new HashMap<>();
             result.put("success", true);
-            result.put("message", "슬랙 연동이 성공적으로 완료되었습니다.");
+            result.put("message", "슬랙 OAuth 연동이 성공적으로 완료되었습니다.");
             result.put("data", integration);
 
             return ResponseEntity.ok(result);

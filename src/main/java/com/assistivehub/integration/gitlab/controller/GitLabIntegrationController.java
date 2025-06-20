@@ -2,6 +2,7 @@ package com.assistivehub.integration.gitlab.controller;
 
 import com.assistivehub.integration.gitlab.dto.GitLabManualSetupRequest;
 import com.assistivehub.integration.gitlab.service.GitLabManualSetupService;
+import com.assistivehub.integration.gitlab.service.GitLabOAuthService;
 import com.assistivehub.entity.GitLabIntegration;
 import com.assistivehub.entity.User;
 import com.assistivehub.service.UserService;
@@ -23,6 +24,9 @@ public class GitLabIntegrationController {
 
     @Autowired
     private GitLabManualSetupService gitLabManualSetupService;
+
+    @Autowired
+    private GitLabOAuthService gitLabOAuthService;
 
     @Autowired
     private UserService userService;
@@ -52,6 +56,73 @@ public class GitLabIntegrationController {
             return bearerToken.substring(7);
         }
         return null;
+    }
+
+    /**
+     * 깃랩 OAuth 인증 URL 생성
+     */
+    @GetMapping("/auth-url")
+    public ResponseEntity<Map<String, Object>> getGitLabAuthUrl(
+            @RequestParam(required = false) String state,
+            HttpServletRequest httpRequest) {
+
+        try {
+            getCurrentUserId(httpRequest); // 인증 확인
+
+            String authUrl = gitLabOAuthService.generateAuthUrl(state);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("authUrl", authUrl);
+            result.put("message", "깃랩 인증 URL이 생성되었습니다.");
+
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("message", e.getMessage());
+
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        }
+    }
+
+    /**
+     * 깃랩 OAuth 콜백 처리
+     */
+    @PostMapping("/callback")
+    public ResponseEntity<Map<String, Object>> handleGitLabCallback(
+            @RequestBody Map<String, String> callbackData,
+            HttpServletRequest httpRequest) {
+
+        try {
+            Long userId = getCurrentUserId(httpRequest);
+            User user = userService.findById(userId);
+
+            String code = callbackData.get("code");
+            String redirectUri = callbackData.get("redirect_uri");
+
+            if (code == null || code.trim().isEmpty()) {
+                throw new RuntimeException("인증 코드가 필요합니다.");
+            }
+
+            GitLabIntegration integration = gitLabOAuthService
+                    .exchangeCodeForToken(user, code, redirectUri);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("message", "깃랩 OAuth 연동이 성공적으로 완료되었습니다.");
+            result.put("data", integration);
+
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("message", e.getMessage());
+
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        }
     }
 
     /**

@@ -3,6 +3,8 @@ package com.assistivehub.integration.notion.controller;
 import com.assistivehub.integration.notion.dto.NotionManualSetupRequest;
 import com.assistivehub.integration.notion.dto.NotionIntegrationResponse;
 import com.assistivehub.integration.notion.service.NotionManualSetupService;
+import com.assistivehub.integration.notion.service.NotionOAuthService;
+import com.assistivehub.entity.NotionIntegration;
 import com.assistivehub.entity.User;
 import com.assistivehub.service.UserService;
 import com.assistivehub.util.JwtUtil;
@@ -23,6 +25,9 @@ public class NotionIntegrationController {
 
     @Autowired
     private NotionManualSetupService notionManualSetupService;
+
+    @Autowired
+    private NotionOAuthService notionOAuthService;
 
     @Autowired
     private UserService userService;
@@ -52,6 +57,73 @@ public class NotionIntegrationController {
             return bearerToken.substring(7);
         }
         return null;
+    }
+
+    /**
+     * 노션 OAuth 인증 URL 생성
+     */
+    @GetMapping("/auth-url")
+    public ResponseEntity<Map<String, Object>> getNotionAuthUrl(
+            @RequestParam(required = false) String state,
+            HttpServletRequest httpRequest) {
+
+        try {
+            getCurrentUserId(httpRequest); // 인증 확인
+
+            String authUrl = notionOAuthService.generateAuthUrl(state);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("authUrl", authUrl);
+            result.put("message", "노션 인증 URL이 생성되었습니다.");
+
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("message", e.getMessage());
+
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        }
+    }
+
+    /**
+     * 노션 OAuth 콜백 처리
+     */
+    @PostMapping("/callback")
+    public ResponseEntity<Map<String, Object>> handleNotionCallback(
+            @RequestBody Map<String, String> callbackData,
+            HttpServletRequest httpRequest) {
+
+        try {
+            Long userId = getCurrentUserId(httpRequest);
+            User user = userService.findById(userId);
+
+            String code = callbackData.get("code");
+            String redirectUri = callbackData.get("redirect_uri");
+
+            if (code == null || code.trim().isEmpty()) {
+                throw new RuntimeException("인증 코드가 필요합니다.");
+            }
+
+            NotionIntegration integration = notionOAuthService
+                    .exchangeCodeForToken(user, code, redirectUri);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("message", "노션 OAuth 연동이 성공적으로 완료되었습니다.");
+            result.put("data", integration);
+
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("message", e.getMessage());
+
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        }
     }
 
     /**
@@ -108,14 +180,7 @@ public class NotionIntegrationController {
             result.put("valid", isValid);
 
             if (isValid) {
-                try {
-                    NotionManualSetupService.NotionUserInfo userInfo = notionManualSetupService
-                            .getNotionUserInfo(token);
-                    result.put("userInfo", userInfo);
-                    result.put("message", "유효한 노션 토큰입니다.");
-                } catch (Exception e) {
-                    result.put("message", "토큰은 유효하지만 사용자 정보를 가져올 수 없습니다.");
-                }
+                result.put("message", "유효한 노션 토큰입니다.");
             } else {
                 result.put("message", "유효하지 않은 노션 토큰입니다.");
             }

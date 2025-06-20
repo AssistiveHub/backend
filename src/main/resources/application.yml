@@ -30,6 +30,36 @@ encryption:
   secret:
     key: ${ENCRYPTION_SECRET_KEY}
 
+# OAuth Configuration for all integrations
+slack:
+  client:
+    id: ${SLACK_CLIENT_ID:dummy}
+    secret: ${SLACK_CLIENT_SECRET:dummy}
+  redirect:
+    uri: ${SLACK_REDIRECT_URI:http://localhost:3000/integrations/slack/callback}
+
+github:
+  client:
+    id: ${GITHUB_CLIENT_ID:dummy}
+    secret: ${GITHUB_CLIENT_SECRET:dummy}
+  redirect:
+    uri: ${GITHUB_REDIRECT_URI:http://localhost:3000/integrations/github/callback}
+
+gitlab:
+  client:
+    id: ${GITLAB_CLIENT_ID:dummy}
+    secret: ${GITLAB_CLIENT_SECRET:dummy}
+  redirect:
+    uri: ${GITLAB_REDIRECT_URI:http://localhost:3000/integrations/gitlab/callback}
+  url: ${GITLAB_URL:https://gitlab.com}
+
+notion:
+  client:
+    id: ${NOTION_CLIENT_ID:dummy}
+    secret: ${NOTION_CLIENT_SECRET:dummy}
+  redirect:
+    uri: ${NOTION_REDIRECT_URI:http://localhost:3000/integrations/notion/callback}
+
 logging:
   level:
     com.assistivehub: DEBUG
