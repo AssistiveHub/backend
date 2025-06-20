@@ -175,6 +175,7 @@ public class GitLabOAuthService {
             // 1. IntegratedService 생성
             IntegratedService integratedService = new IntegratedService();
             integratedService.setUser(user);
+            integratedService.setServiceType(IntegratedService.ServiceType.GITLAB);
             integratedService.setServiceName("GitLab");
             integratedService.setIsActive(true);
             integratedService.setCreatedAt(LocalDateTime.now());

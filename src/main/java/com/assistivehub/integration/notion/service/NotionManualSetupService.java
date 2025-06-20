@@ -163,6 +163,7 @@ public class NotionManualSetupService {
         // IntegratedService 생성
         IntegratedService integratedService = new IntegratedService();
         integratedService.setUser(user);
+        integratedService.setServiceType(IntegratedService.ServiceType.NOTION);
         integratedService.setServiceName("Notion");
         integratedService.setIsActive(true);
         integratedService.setCreatedAt(LocalDateTime.now());
