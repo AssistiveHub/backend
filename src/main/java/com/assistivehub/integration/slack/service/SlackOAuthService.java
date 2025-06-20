@@ -25,10 +25,10 @@ import java.util.Map;
 @Service
 public class SlackOAuthService {
 
-    @Value("${slack.client.id:}")
+    @Value("${slack.client.id:dummy}")
     private String clientId;
 
-    @Value("${slack.client.secret:}")
+    @Value("${slack.client.secret:dummy}")
     private String clientSecret;
 
     @Value("${slack.redirect.uri:http://localhost:3000/integrations/slack/callback}")
