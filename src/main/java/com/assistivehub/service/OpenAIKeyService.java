@@ -32,12 +32,20 @@ public class OpenAIKeyService {
     @Autowired
     private OpenAIValidationService openAIValidationService;
 
+    private static final int MAX_KEYS_PER_USER = 5;
+
     /**
      * OpenAI 키 생성 (키 유효성 검증 포함)
      */
     public OpenAIKeyResponse createOpenAIKey(Long userId, OpenAIKeyRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+
+        // 사용자당 키 개수 제한 (최대 5개)
+        long totalKeyCount = openAIKeyRepository.countByUser(user);
+        if (totalKeyCount >= MAX_KEYS_PER_USER) {
+            throw new RuntimeException("사용자당 최대 " + MAX_KEYS_PER_USER + "개의 OpenAI 키만 등록할 수 있습니다.");
+        }
 
         // 1. OpenAI API 키 유효성 검증
         OpenAIValidationService.OpenAIValidationResult validationResult = openAIValidationService
@@ -53,11 +61,16 @@ public class OpenAIKeyService {
             throw new RuntimeException("이미 존재하는 키 이름입니다.");
         }
 
-        // 3. API 키 암호화
+        // 3. 기존 활성 키가 없으면 첫 번째 키를 활성으로 설정
+        boolean hasActiveKey = openAIKeyRepository.countByUserAndIsActiveTrue(user) > 0;
+        boolean shouldActivate = !hasActiveKey;
+
+        // 4. API 키 암호화
         String encryptedKey = encryptionUtil.encrypt(request.getApiKey());
 
-        // 4. 저장
+        // 5. 저장
         OpenAIKey openAIKey = new OpenAIKey(user, encryptedKey, request.getKeyName());
+        openAIKey.setIsActive(shouldActivate);
         OpenAIKey savedKey = openAIKeyRepository.save(openAIKey);
 
         return new OpenAIKeyResponse(savedKey, request.getApiKey());
@@ -198,5 +211,51 @@ public class OpenAIKeyService {
                 .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
 
         return openAIKeyRepository.countByUserAndIsActiveTrue(user);
+    }
+
+    /**
+     * 특정 OpenAI 키를 활성화 (다른 키들은 자동 비활성화)
+     */
+    public OpenAIKeyResponse activateOpenAIKey(Long userId, Long keyId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+
+        OpenAIKey targetKey = openAIKeyRepository.findByIdAndUser(keyId, user)
+                .orElseThrow(() -> new RuntimeException("OpenAI 키를 찾을 수 없습니다."));
+
+        // 1. 해당 사용자의 모든 키를 비활성화
+        List<OpenAIKey> allUserKeys = openAIKeyRepository.findByUser(user);
+        for (OpenAIKey key : allUserKeys) {
+            key.setIsActive(false);
+        }
+
+        // 2. 선택한 키만 활성화
+        targetKey.setIsActive(true);
+
+        // 3. 모든 변경사항 저장
+        openAIKeyRepository.saveAll(allUserKeys);
+
+        String decryptedKey = encryptionUtil.decrypt(targetKey.getEncryptedKey());
+        return new OpenAIKeyResponse(targetKey, decryptedKey);
+    }
+
+    /**
+     * 현재 활성화된 OpenAI 키 조회
+     */
+    @Transactional(readOnly = true)
+    public OpenAIKeyResponse getActiveOpenAIKey(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+
+        List<OpenAIKey> activeKeys = openAIKeyRepository.findByUserAndIsActiveTrue(user);
+
+        if (activeKeys.isEmpty()) {
+            throw new RuntimeException("활성화된 OpenAI 키가 없습니다.");
+        }
+
+        // 활성 키는 1개만 있어야 하지만, 혹시 여러 개가 있다면 첫 번째 반환
+        OpenAIKey activeKey = activeKeys.get(0);
+        String decryptedKey = encryptionUtil.decrypt(activeKey.getEncryptedKey());
+        return new OpenAIKeyResponse(activeKey, decryptedKey);
     }
 }

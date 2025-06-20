@@ -7,6 +7,10 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "openai_keys")
+// 사용자당 1개만 허용하려면 아래 주석 해제
+// @Table(name = "openai_keys",
+// uniqueConstraints = @UniqueConstraint(columnNames = {"user_id",
+// "is_active"}))
 public class OpenAIKey {
 
     @Id

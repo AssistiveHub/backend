@@ -313,4 +313,83 @@ public class OpenAIKeyController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
         }
     }
+
+    /**
+     * 특정 OpenAI 키 활성화 (다른 키들은 자동 비활성화)
+     */
+    @PatchMapping("/{keyId}/activate")
+    public ResponseEntity<Map<String, Object>> activateOpenAIKey(
+            @PathVariable Long keyId,
+            HttpServletRequest httpRequest) {
+
+        try {
+            Long userId = getCurrentUserId(httpRequest);
+            OpenAIKeyResponse response = openAIKeyService.activateOpenAIKey(userId, keyId);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("message", "OpenAI 키가 활성화되었습니다.");
+            result.put("data", response);
+
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("message", e.getMessage());
+
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        }
+    }
+
+    /**
+     * 현재 활성화된 OpenAI 키 조회
+     */
+    @GetMapping("/active")
+    public ResponseEntity<Map<String, Object>> getActiveOpenAIKey(HttpServletRequest httpRequest) {
+        try {
+            Long userId = getCurrentUserId(httpRequest);
+            OpenAIKeyResponse response = openAIKeyService.getActiveOpenAIKey(userId);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("data", response);
+
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("message", e.getMessage());
+
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        }
+    }
+
+    /**
+     * 현재 활성화된 OpenAI 키의 복호화된 값 조회 (실제 사용)
+     */
+    @GetMapping("/active/decrypt")
+    public ResponseEntity<Map<String, Object>> getActiveDecryptedApiKey(HttpServletRequest httpRequest) {
+        try {
+            Long userId = getCurrentUserId(httpRequest);
+            OpenAIKeyResponse activeKey = openAIKeyService.getActiveOpenAIKey(userId);
+            String decryptedKey = openAIKeyService.getDecryptedApiKey(userId, activeKey.getId());
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("apiKey", decryptedKey);
+            result.put("keyName", activeKey.getKeyName());
+            result.put("keyId", activeKey.getId());
+
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("message", e.getMessage());
+
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        }
+    }
 }
