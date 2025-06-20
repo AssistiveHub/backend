@@ -31,6 +31,8 @@ public class AuthResponse {
     private User.UserStatus status;
     private Boolean emailVerified;
 
+    private boolean hasOpenAIKey;
+
     // Constructors
     public AuthResponse() {
     }
@@ -49,6 +51,24 @@ public class AuthResponse {
         this.lastLoginAt = user.getLastLoginAt();
         this.status = user.getStatus();
         this.emailVerified = user.getEmailVerified();
+        this.hasOpenAIKey = false;
+    }
+
+    public AuthResponse(String token, User user, boolean hasOpenAIKey) {
+        this.token = token;
+        this.id = user.getId();
+        this.email = user.getEmail();
+        this.name = user.getName();
+        this.phoneNumber = user.getPhoneNumber();
+        this.birthDate = user.getBirthDate();
+        this.gender = user.getGender();
+        this.address = user.getAddress();
+        this.profileImageUrl = user.getProfileImageUrl();
+        this.createdAt = user.getCreatedAt();
+        this.lastLoginAt = user.getLastLoginAt();
+        this.status = user.getStatus();
+        this.emailVerified = user.getEmailVerified();
+        this.hasOpenAIKey = hasOpenAIKey;
     }
 
     // Getters and Setters
@@ -162,5 +182,13 @@ public class AuthResponse {
 
     public void setEmailVerified(Boolean emailVerified) {
         this.emailVerified = emailVerified;
+    }
+
+    public boolean isHasOpenAIKey() {
+        return hasOpenAIKey;
+    }
+
+    public void setHasOpenAIKey(boolean hasOpenAIKey) {
+        this.hasOpenAIKey = hasOpenAIKey;
     }
 }

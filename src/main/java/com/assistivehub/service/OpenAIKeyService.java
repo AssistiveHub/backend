@@ -29,22 +29,34 @@ public class OpenAIKeyService {
     @Autowired
     private EncryptionUtil encryptionUtil;
 
+    @Autowired
+    private OpenAIValidationService openAIValidationService;
+
     /**
-     * OpenAI 키 생성
+     * OpenAI 키 생성 (키 유효성 검증 포함)
      */
     public OpenAIKeyResponse createOpenAIKey(Long userId, OpenAIKeyRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
 
-        // 키 이름 중복 체크
+        // 1. OpenAI API 키 유효성 검증
+        OpenAIValidationService.OpenAIValidationResult validationResult = openAIValidationService
+                .validateApiKey(request.getApiKey());
+
+        if (!validationResult.isValid()) {
+            throw new RuntimeException("사용할 수 없는 OpenAI API 키입니다: " + validationResult.getMessage());
+        }
+
+        // 2. 키 이름 중복 체크
         if (request.getKeyName() != null &&
                 openAIKeyRepository.existsByUserAndKeyName(user, request.getKeyName())) {
             throw new RuntimeException("이미 존재하는 키 이름입니다.");
         }
 
-        // API 키 암호화
+        // 3. API 키 암호화
         String encryptedKey = encryptionUtil.encrypt(request.getApiKey());
 
+        // 4. 저장
         OpenAIKey openAIKey = new OpenAIKey(user, encryptedKey, request.getKeyName());
         OpenAIKey savedKey = openAIKeyRepository.save(openAIKey);
 
@@ -90,7 +102,7 @@ public class OpenAIKeyService {
     }
 
     /**
-     * OpenAI 키 수정
+     * OpenAI 키 수정 (키 유효성 검증 포함)
      */
     public OpenAIKeyResponse updateOpenAIKey(Long userId, Long keyId, OpenAIKeyUpdateRequest request) {
         User user = userRepository.findById(userId)
@@ -99,7 +111,25 @@ public class OpenAIKeyService {
         OpenAIKey openAIKey = openAIKeyRepository.findByIdAndUser(keyId, user)
                 .orElseThrow(() -> new RuntimeException("OpenAI 키를 찾을 수 없습니다."));
 
-        // 키 이름 중복 체크 (현재 키 제외)
+        // 1. 새로운 API 키가 제공된 경우 유효성 검증
+        String decryptedKey;
+        if (request.getApiKey() != null && !request.getApiKey().trim().isEmpty()) {
+            // OpenAI API 키 유효성 검증
+            OpenAIValidationService.OpenAIValidationResult validationResult = openAIValidationService
+                    .validateApiKey(request.getApiKey());
+
+            if (!validationResult.isValid()) {
+                throw new RuntimeException("사용할 수 없는 OpenAI API 키입니다: " + validationResult.getMessage());
+            }
+
+            String encryptedKey = encryptionUtil.encrypt(request.getApiKey());
+            openAIKey.setEncryptedKey(encryptedKey);
+            decryptedKey = request.getApiKey();
+        } else {
+            decryptedKey = encryptionUtil.decrypt(openAIKey.getEncryptedKey());
+        }
+
+        // 2. 키 이름 중복 체크 (현재 키 제외)
         if (request.getKeyName() != null) {
             Optional<OpenAIKey> existingKey = openAIKeyRepository
                     .findByUserAndKeyNameExcludingId(user, request.getKeyName(), keyId);
@@ -109,17 +139,7 @@ public class OpenAIKeyService {
             openAIKey.setKeyName(request.getKeyName());
         }
 
-        // API 키 업데이트 (새 키가 제공된 경우만)
-        String decryptedKey;
-        if (request.getApiKey() != null && !request.getApiKey().trim().isEmpty()) {
-            String encryptedKey = encryptionUtil.encrypt(request.getApiKey());
-            openAIKey.setEncryptedKey(encryptedKey);
-            decryptedKey = request.getApiKey();
-        } else {
-            decryptedKey = encryptionUtil.decrypt(openAIKey.getEncryptedKey());
-        }
-
-        // 활성 상태 업데이트
+        // 3. 활성 상태 업데이트
         if (request.getIsActive() != null) {
             openAIKey.setIsActive(request.getIsActive());
         }

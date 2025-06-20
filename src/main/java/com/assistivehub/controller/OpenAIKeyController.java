@@ -7,6 +7,7 @@ import com.assistivehub.entity.User;
 import com.assistivehub.service.OpenAIKeyService;
 import com.assistivehub.service.UserService;
 import com.assistivehub.util.JwtUtil;
+import com.assistivehub.service.OpenAIValidationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -31,6 +32,9 @@ public class OpenAIKeyController {
 
     @Autowired
     private JwtUtil jwtUtil;
+
+    @Autowired
+    private OpenAIValidationService openAIValidationService;
 
     /**
      * 현재 요청에서 사용자 ID 추출
@@ -268,6 +272,43 @@ public class OpenAIKeyController {
             Map<String, Object> error = new HashMap<>();
             error.put("success", false);
             error.put("message", e.getMessage());
+
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        }
+    }
+
+    /**
+     * OpenAI API 키 유효성 검증 (저장하지 않고 테스트만)
+     */
+    @PostMapping("/validate")
+    public ResponseEntity<Map<String, Object>> validateOpenAIKey(
+            @Valid @RequestBody OpenAIKeyRequest request,
+            HttpServletRequest httpRequest) {
+
+        try {
+            // 현재 사용자 확인
+            getCurrentUserId(httpRequest);
+
+            // OpenAI API 키 검증
+            OpenAIValidationService.OpenAIValidationResult validationResult = openAIValidationService
+                    .validateApiKey(request.getApiKey());
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", validationResult.isValid());
+            result.put("message", validationResult.getMessage());
+            result.put("valid", validationResult.isValid());
+
+            if (validationResult.isValid()) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(result);
+            }
+
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("message", e.getMessage());
+            error.put("valid", false);
 
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
         }

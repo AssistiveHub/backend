@@ -5,6 +5,7 @@ import com.assistivehub.dto.LoginRequest;
 import com.assistivehub.dto.SignupRequest;
 import com.assistivehub.entity.User;
 import com.assistivehub.repository.UserRepository;
+import com.assistivehub.repository.OpenAIKeyRepository;
 import com.assistivehub.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -21,6 +22,9 @@ public class UserService implements UserDetailsService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private OpenAIKeyRepository openAIKeyRepository;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -65,7 +69,10 @@ public class UserService implements UserDetailsService {
         UserDetails userDetails = loadUserByUsername(savedUser.getEmail());
         String token = jwtUtil.generateToken(userDetails);
 
-        return new AuthResponse(token, savedUser);
+        // OpenAI 키 보유 여부 확인 (신규 가입자는 항상 false)
+        boolean hasOpenAIKey = openAIKeyRepository.countByUserAndIsActiveTrue(savedUser) > 0;
+
+        return new AuthResponse(token, savedUser, hasOpenAIKey);
     }
 
     public AuthResponse login(LoginRequest loginRequest) {
@@ -86,7 +93,10 @@ public class UserService implements UserDetailsService {
         UserDetails userDetails = loadUserByUsername(user.getEmail());
         String token = jwtUtil.generateToken(userDetails);
 
-        return new AuthResponse(token, user);
+        // OpenAI 키 보유 여부 확인
+        boolean hasOpenAIKey = openAIKeyRepository.countByUserAndIsActiveTrue(user) > 0;
+
+        return new AuthResponse(token, user, hasOpenAIKey);
     }
 
     public User findByEmail(String email) {
