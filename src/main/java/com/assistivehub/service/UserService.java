@@ -2,6 +2,7 @@ package com.assistivehub.service;
 
 import com.assistivehub.dto.AuthResponse;
 import com.assistivehub.dto.LoginRequest;
+import com.assistivehub.dto.PasswordChangeRequest;
 import com.assistivehub.dto.SignupRequest;
 import com.assistivehub.dto.UserUpdateRequest;
 import com.assistivehub.entity.User;
@@ -153,5 +154,72 @@ public class UserService implements UserDetailsService {
     public User findById(Long userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+    }
+
+    /**
+     * 비밀번호 변경
+     */
+    public void changePassword(Long userId, PasswordChangeRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+
+        // 1. 현재 비밀번호 확인
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new RuntimeException("현재 비밀번호가 올바르지 않습니다.");
+        }
+
+        // 2. 새 비밀번호와 확인 비밀번호 일치 확인
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new RuntimeException("새 비밀번호와 확인 비밀번호가 일치하지 않습니다.");
+        }
+
+        // 3. 현재 비밀번호와 새 비밀번호가 같은지 확인
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
+            throw new RuntimeException("새 비밀번호는 현재 비밀번호와 달라야 합니다.");
+        }
+
+        // 4. 비밀번호 강도 검증 (선택사항)
+        validatePasswordStrength(request.getNewPassword());
+
+        // 5. 새 비밀번호로 업데이트
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+    }
+
+    /**
+     * 비밀번호 강도 검증
+     */
+    private void validatePasswordStrength(String password) {
+        // 최소 8자 이상
+        if (password.length() < 8) {
+            throw new RuntimeException("비밀번호는 최소 8자 이상이어야 합니다.");
+        }
+
+        // 영문 대소문자, 숫자, 특수문자 중 3가지 이상 포함 권장
+        int criteriaCount = 0;
+
+        if (password.matches(".*[a-z].*"))
+            criteriaCount++; // 소문자
+        if (password.matches(".*[A-Z].*"))
+            criteriaCount++; // 대문자
+        if (password.matches(".*[0-9].*"))
+            criteriaCount++; // 숫자
+        if (password.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?].*"))
+            criteriaCount++; // 특수문자
+
+        if (criteriaCount < 2) {
+            throw new RuntimeException("비밀번호는 영문, 숫자, 특수문자 중 최소 2가지 이상을 포함해야 합니다.");
+        }
+
+        // 연속된 문자나 숫자 3개 이상 금지
+        if (password.matches(
+                ".*(012|123|234|345|456|567|678|789|890|abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz).*")) {
+            throw new RuntimeException("연속된 문자나 숫자 3개 이상은 사용할 수 없습니다.");
+        }
+
+        // 같은 문자 3개 이상 연속 금지
+        if (password.matches(".*(.)\\1{2,}.*")) {
+            throw new RuntimeException("같은 문자를 3개 이상 연속으로 사용할 수 없습니다.");
+        }
     }
 }

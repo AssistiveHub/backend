@@ -1,5 +1,6 @@
 package com.assistivehub.controller;
 
+import com.assistivehub.dto.PasswordChangeRequest;
 import com.assistivehub.dto.UserUpdateRequest;
 import com.assistivehub.entity.User;
 import com.assistivehub.service.UserService;
@@ -120,6 +121,33 @@ public class UserController {
             result.put("success", true);
             result.put("message", "사용자 정보가 성공적으로 업데이트되었습니다.");
             result.put("data", userInfo);
+
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("message", e.getMessage());
+
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        }
+    }
+
+    /**
+     * 비밀번호 변경
+     */
+    @PatchMapping("/password")
+    public ResponseEntity<Map<String, Object>> changePassword(
+            @Valid @RequestBody PasswordChangeRequest request,
+            HttpServletRequest httpRequest) {
+
+        try {
+            Long userId = getCurrentUserId(httpRequest);
+            userService.changePassword(userId, request);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("message", "비밀번호가 성공적으로 변경되었습니다.");
 
             return ResponseEntity.ok(result);
 
