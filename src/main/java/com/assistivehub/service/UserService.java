@@ -3,6 +3,7 @@ package com.assistivehub.service;
 import com.assistivehub.dto.AuthResponse;
 import com.assistivehub.dto.LoginRequest;
 import com.assistivehub.dto.SignupRequest;
+import com.assistivehub.dto.UserUpdateRequest;
 import com.assistivehub.entity.User;
 import com.assistivehub.repository.UserRepository;
 import com.assistivehub.repository.OpenAIKeyRepository;
@@ -114,5 +115,43 @@ public class UserService implements UserDetailsService {
 
         user.setStatus(User.UserStatus.DELETED);
         userRepository.save(user);
+    }
+
+    /**
+     * 사용자 정보 업데이트
+     */
+    public User updateUserInfo(Long userId, UserUpdateRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+
+        // null이 아닌 값들만 업데이트 (부분 업데이트 지원)
+        if (request.getName() != null && !request.getName().trim().isEmpty()) {
+            user.setName(request.getName().trim());
+        }
+        if (request.getPhoneNumber() != null && !request.getPhoneNumber().trim().isEmpty()) {
+            user.setPhoneNumber(request.getPhoneNumber().trim());
+        }
+        if (request.getBirthDate() != null) {
+            user.setBirthDate(request.getBirthDate());
+        }
+        if (request.getGender() != null) {
+            user.setGender(request.getGender());
+        }
+        if (request.getAddress() != null) {
+            user.setAddress(request.getAddress().trim());
+        }
+        if (request.getProfileImageUrl() != null) {
+            user.setProfileImageUrl(request.getProfileImageUrl().trim());
+        }
+
+        return userRepository.save(user);
+    }
+
+    /**
+     * 사용자 ID로 조회
+     */
+    public User findById(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
     }
 }
