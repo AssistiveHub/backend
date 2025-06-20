@@ -116,6 +116,7 @@ $RECYCLE.BIN/
 .env.production.local
 
 ### Application specific ###
+application.properties
 application-*.yml
 application-*.yaml
 application-*.properties
