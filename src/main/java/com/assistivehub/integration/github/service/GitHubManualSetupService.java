@@ -247,6 +247,57 @@ public class GitHubManualSetupService {
     }
 
     /**
+     * 사용자의 깃허브 연동 목록 조회
+     */
+    public List<GitHubIntegration> getGitHubIntegrationsByUser(User user, boolean activeOnly) {
+        try {
+            if (activeOnly) {
+                return gitHubIntegrationRepository.findActiveByUserId(user.getId());
+            } else {
+                return gitHubIntegrationRepository.findByUserId(user.getId());
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("깃허브 연동 목록 조회 실패: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 특정 깃허브 연동 조회
+     */
+    public GitHubIntegration getGitHubIntegrationById(Long userId, Long integrationId) {
+        try {
+            GitHubIntegration integration = gitHubIntegrationRepository.findById(integrationId)
+                    .orElseThrow(() -> new RuntimeException("연동을 찾을 수 없습니다."));
+
+            if (!integration.getIntegratedService().getUser().getId().equals(userId)) {
+                throw new RuntimeException("권한이 없습니다.");
+            }
+
+            return integration;
+        } catch (Exception e) {
+            throw new RuntimeException("깃허브 연동 조회 실패: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 깃허브 연동 활성화/비활성화 토글
+     */
+    @Transactional
+    public GitHubIntegration toggleGitHubIntegration(Long userId, Long integrationId) {
+        try {
+            GitHubIntegration integration = getGitHubIntegrationById(userId, integrationId);
+
+            boolean currentStatus = integration.getIntegratedService().getIsActive();
+            integration.getIntegratedService().setIsActive(!currentStatus);
+            integration.getIntegratedService().setUpdatedAt(LocalDateTime.now());
+
+            return gitHubIntegrationRepository.save(integration);
+        } catch (Exception e) {
+            throw new RuntimeException("깃허브 연동 토글 실패: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * 깃허브 사용자 정보 클래스
      */
     public static class GitHubUserInfo {
