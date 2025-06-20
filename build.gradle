@@ -40,6 +40,13 @@ dependencies {
     // Password Encoding
     implementation 'org.springframework.security:spring-security-crypto'
     
+    // HTTP Client for API calls
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+    
+    // JSON Processing
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+    
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
 

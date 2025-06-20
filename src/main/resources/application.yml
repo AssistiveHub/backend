@@ -30,6 +30,14 @@ encryption:
   secret:
     key: ${ENCRYPTION_SECRET_KEY}
 
+# Slack OAuth Configuration
+slack:
+  client:
+    id: ${SLACK_CLIENT_ID}
+    secret: ${SLACK_CLIENT_SECRET}
+  redirect:
+    uri: ${SLACK_REDIRECT_URI:http://localhost:3000/integrations/slack/callback}
+
 logging:
   level:
     com.assistivehub: DEBUG
