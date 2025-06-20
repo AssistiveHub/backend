@@ -124,6 +124,11 @@ application-*.properties
 !application.yaml.example
 !application.properties.example
 
+# 로컬 개발용 설정 파일도 제외 (민감한 정보 포함)
+application-local.yml
+application-local.yaml
+application-local.properties
+
 ### Database ###
 *.db
 *.sqlite

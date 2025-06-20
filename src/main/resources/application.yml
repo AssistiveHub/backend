@@ -26,6 +26,10 @@ jwt:
   secret: ${JWT_SECRET}
   expiration: ${JWT_EXPIRATION} # 24시간 (milliseconds)
 
+encryption:
+  secret:
+    key: ${ENCRYPTION_SECRET_KEY}
+
 logging:
   level:
     com.assistivehub: DEBUG
