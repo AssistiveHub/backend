@@ -207,21 +207,31 @@ public class GitHubRepositoryController {
 
     @PostMapping("/exchange-token")
     public ResponseEntity<Map<String, Object>> exchangeToken(@RequestBody Map<String, String> request) {
+        String authorizationCode = request.get("code");
+        if (authorizationCode == null || authorizationCode.trim().isEmpty()) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("message", "Authorization code is required");
+            return ResponseEntity.badRequest().body(error);
+        }
+
         try {
-            String code = request.get("code");
-            if (code == null || code.trim().isEmpty()) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("success", false, "message", "Authorization code is required"));
-            }
+            String accessToken = gitHubRepositoryService.exchangeCodeForToken(authorizationCode);
 
-            String accessToken = gitHubRepositoryService.exchangeCodeForToken(code);
+            Map<String, Object> tokenData = new HashMap<>();
+            tokenData.put("access_token", accessToken);
 
-            return ResponseEntity.ok(Map.of(
-                    "success", true,
-                    "data", Map.of("access_token", accessToken)));
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("message", "Token exchanged successfully");
+            result.put("data", tokenData);
+
+            return ResponseEntity.ok(result);
         } catch (Exception e) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("success", false, "message", e.getMessage()));
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
         }
     }
 
@@ -234,12 +244,16 @@ public class GitHubRepositoryController {
             List<Map<String, Object>> repositories = gitHubRepositoryService
                     .fetchGitHubRepositoriesWithStatus(accessToken, userId);
 
-            return ResponseEntity.ok(Map.of(
-                    "success", true,
-                    "data", repositories));
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("data", repositories);
+
+            return ResponseEntity.ok(result);
         } catch (Exception e) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("success", false, "message", e.getMessage()));
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
         }
     }
 }
