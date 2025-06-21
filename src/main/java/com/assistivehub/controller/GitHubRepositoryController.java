@@ -256,4 +256,201 @@ public class GitHubRepositoryController {
             return ResponseEntity.badRequest().body(error);
         }
     }
+
+    /**
+     * 특정 리포지토리의 커밋 정보 조회
+     */
+    @GetMapping("/{repositoryId}/commits")
+    public ResponseEntity<Map<String, Object>> getRepositoryCommits(
+            @PathVariable Long repositoryId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "5") int per_page,
+            HttpServletRequest request) {
+        try {
+            Long userId = getCurrentUserId(request);
+            List<Map<String, Object>> commits = gitHubRepositoryService.fetchRepositoryCommits(userId, repositoryId,
+                    page, per_page);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("data", commits);
+
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    /**
+     * 특정 리포지토리의 상세 정보 조회
+     */
+    @GetMapping("/{repositoryId}/details")
+    public ResponseEntity<Map<String, Object>> getRepositoryDetails(
+            @PathVariable Long repositoryId,
+            HttpServletRequest request) {
+        try {
+            Long userId = getCurrentUserId(request);
+            Map<String, Object> details = gitHubRepositoryService.fetchRepositoryDetails(userId, repositoryId);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("data", details);
+
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    /**
+     * 특정 리포지토리의 브랜치 정보 조회
+     */
+    @GetMapping("/{repositoryId}/branches")
+    public ResponseEntity<Map<String, Object>> getRepositoryBranches(
+            @PathVariable Long repositoryId,
+            HttpServletRequest request) {
+        try {
+            Long userId = getCurrentUserId(request);
+            List<Map<String, Object>> branches = gitHubRepositoryService.fetchRepositoryBranches(userId, repositoryId);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("data", branches);
+
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    /**
+     * 특정 리포지토리의 기여자 정보 조회
+     */
+    @GetMapping("/{repositoryId}/contributors")
+    public ResponseEntity<Map<String, Object>> getRepositoryContributors(
+            @PathVariable Long repositoryId,
+            HttpServletRequest request) {
+        try {
+            Long userId = getCurrentUserId(request);
+            List<Map<String, Object>> contributors = gitHubRepositoryService.fetchRepositoryContributors(userId,
+                    repositoryId);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("data", contributors);
+
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    /**
+     * 특정 리포지토리의 언어 통계 조회
+     */
+    @GetMapping("/{repositoryId}/languages")
+    public ResponseEntity<Map<String, Object>> getRepositoryLanguages(
+            @PathVariable Long repositoryId,
+            HttpServletRequest request) {
+        try {
+            Long userId = getCurrentUserId(request);
+            Map<String, Object> languages = gitHubRepositoryService.fetchRepositoryLanguages(userId, repositoryId);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("data", languages);
+
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    /**
+     * 특정 리포지토리의 Pull Request 정보 조회
+     */
+    @GetMapping("/{repositoryId}/pull-requests")
+    public ResponseEntity<Map<String, Object>> getRepositoryPullRequests(
+            @PathVariable Long repositoryId,
+            HttpServletRequest request) {
+        try {
+            Long userId = getCurrentUserId(request);
+            List<Map<String, Object>> pullRequests = gitHubRepositoryService.fetchRepositoryPullRequests(userId,
+                    repositoryId);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("data", pullRequests);
+
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    /**
+     * 특정 리포지토리의 Issue 정보 조회
+     */
+    @GetMapping("/{repositoryId}/issues")
+    public ResponseEntity<Map<String, Object>> getRepositoryIssues(
+            @PathVariable Long repositoryId,
+            HttpServletRequest request) {
+        try {
+            Long userId = getCurrentUserId(request);
+            List<Map<String, Object>> issues = gitHubRepositoryService.fetchRepositoryIssues(userId, repositoryId);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("data", issues);
+
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    /**
+     * 특정 리포지토리의 릴리즈 정보 조회
+     */
+    @GetMapping("/{repositoryId}/releases")
+    public ResponseEntity<Map<String, Object>> getRepositoryReleases(
+            @PathVariable Long repositoryId,
+            HttpServletRequest request) {
+        try {
+            Long userId = getCurrentUserId(request);
+            List<Map<String, Object>> releases = gitHubRepositoryService.fetchRepositoryReleases(userId, repositoryId);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("data", releases);
+
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
 }

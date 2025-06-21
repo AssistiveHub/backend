@@ -18,6 +18,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -354,6 +355,464 @@ public class GitHubRepositoryService {
 
         } catch (Exception e) {
             throw new RuntimeException("GitHub 사용자 정보를 가져올 수 없습니다: " + e.getMessage());
+        }
+    }
+
+    /**
+     * GitHub API로 커밋 정보 조회
+     */
+    public List<Map<String, Object>> fetchRepositoryCommits(Long userId, Long repositoryId) {
+        return fetchRepositoryCommits(userId, repositoryId, 1, 10);
+    }
+
+    public List<Map<String, Object>> fetchRepositoryCommits(Long userId, Long repositoryId, int page, int perPage) {
+        try {
+            // 리포지토리 정보 조회
+            Optional<GitHubRepository> repositoryOpt = gitHubRepositoryRepository.findByUserIdAndRepositoryId(userId,
+                    repositoryId);
+            if (!repositoryOpt.isPresent()) {
+                throw new RuntimeException("리포지토리를 찾을 수 없습니다.");
+            }
+
+            GitHubRepository repository = repositoryOpt.get();
+            String[] repoInfo = parseRepositoryUrl(repository.getRepositoryUrl());
+            String owner = repoInfo[0];
+            String repo = repoInfo[1];
+
+            // GitHub API로 커밋 조회 (페이지네이션 적용)
+            String response = webClient.get()
+                    .uri("/repos/{owner}/{repo}/commits?per_page={perPage}&page={page}&sha={branch}",
+                            owner, repo, perPage, page, repository.getDefaultBranch())
+                    .header(HttpHeaders.AUTHORIZATION, "token " + repository.getAccessToken())
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+
+            JsonNode commitsNode = objectMapper.readTree(response);
+            List<Map<String, Object>> commits = new java.util.ArrayList<>();
+
+            for (JsonNode commitNode : commitsNode) {
+                Map<String, Object> commit = new java.util.HashMap<>();
+
+                // 커밋 기본 정보
+                commit.put("sha", commitNode.get("sha").asText());
+                commit.put("message", commitNode.get("commit").get("message").asText());
+
+                // 작성자 정보
+                JsonNode authorNode = commitNode.get("commit").get("author");
+                commit.put("author_name", authorNode.get("name").asText());
+                commit.put("author_email", authorNode.get("email").asText());
+                commit.put("date", authorNode.get("date").asText());
+
+                // GitHub 사용자 정보 (있는 경우)
+                if (commitNode.has("author") && !commitNode.get("author").isNull()) {
+                    JsonNode githubAuthor = commitNode.get("author");
+                    commit.put("github_username", githubAuthor.get("login").asText());
+                    commit.put("avatar_url", githubAuthor.get("avatar_url").asText());
+                }
+
+                // 커밋 URL
+                commit.put("html_url", commitNode.get("html_url").asText());
+
+                commits.add(commit);
+            }
+
+            return commits;
+        } catch (Exception e) {
+            throw new RuntimeException("커밋 정보를 가져오는 중 오류가 발생했습니다: " + e.getMessage());
+        }
+    }
+
+    /**
+     * GitHub API로 리포지토리 상세 정보 조회 (통계 포함)
+     */
+    public Map<String, Object> fetchRepositoryDetails(Long userId, Long repositoryId) {
+        try {
+            // 리포지토리 정보 조회
+            Optional<GitHubRepository> repositoryOpt = gitHubRepositoryRepository.findByUserIdAndRepositoryId(userId,
+                    repositoryId);
+            if (!repositoryOpt.isPresent()) {
+                throw new RuntimeException("리포지토리를 찾을 수 없습니다.");
+            }
+
+            GitHubRepository repository = repositoryOpt.get();
+            String[] repoInfo = parseRepositoryUrl(repository.getRepositoryUrl());
+            String owner = repoInfo[0];
+            String repo = repoInfo[1];
+
+            // GitHub API로 리포지토리 상세 정보 조회
+            String response = webClient.get()
+                    .uri("/repos/{owner}/{repo}", owner, repo)
+                    .header(HttpHeaders.AUTHORIZATION, "token " + repository.getAccessToken())
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+
+            JsonNode repoNode = objectMapper.readTree(response);
+            Map<String, Object> details = new java.util.HashMap<>();
+
+            // 기본 정보
+            details.put("name", repoNode.get("name").asText());
+            details.put("full_name", repoNode.get("full_name").asText());
+            details.put("description", repoNode.has("description") && !repoNode.get("description").isNull()
+                    ? repoNode.get("description").asText()
+                    : null);
+            details.put("html_url", repoNode.get("html_url").asText());
+            details.put("clone_url", repoNode.get("clone_url").asText());
+
+            // 통계 정보
+            details.put("stargazers_count", repoNode.get("stargazers_count").asInt());
+            details.put("forks_count", repoNode.get("forks_count").asInt());
+            details.put("open_issues_count", repoNode.get("open_issues_count").asInt());
+            details.put("watchers_count", repoNode.get("watchers_count").asInt());
+            details.put("size", repoNode.get("size").asInt()); // KB 단위
+
+            // 언어 및 기타 정보
+            details.put("language", repoNode.has("language") && !repoNode.get("language").isNull()
+                    ? repoNode.get("language").asText()
+                    : null);
+            details.put("default_branch", repoNode.get("default_branch").asText());
+            details.put("private", repoNode.get("private").asBoolean());
+            details.put("created_at", repoNode.get("created_at").asText());
+            details.put("updated_at", repoNode.get("updated_at").asText());
+            details.put("pushed_at", repoNode.get("pushed_at").asText());
+
+            // 소유자 정보
+            JsonNode ownerNode = repoNode.get("owner");
+            Map<String, Object> owner_info = new java.util.HashMap<>();
+            owner_info.put("login", ownerNode.get("login").asText());
+            owner_info.put("avatar_url", ownerNode.get("avatar_url").asText());
+            owner_info.put("html_url", ownerNode.get("html_url").asText());
+            details.put("owner", owner_info);
+
+            return details;
+        } catch (Exception e) {
+            throw new RuntimeException("리포지토리 상세 정보를 가져오는 중 오류가 발생했습니다: " + e.getMessage());
+        }
+    }
+
+    /**
+     * GitHub API로 브랜치 정보 조회
+     */
+    public List<Map<String, Object>> fetchRepositoryBranches(Long userId, Long repositoryId) {
+        try {
+            Optional<GitHubRepository> repositoryOpt = gitHubRepositoryRepository.findByUserIdAndRepositoryId(userId,
+                    repositoryId);
+            if (!repositoryOpt.isPresent()) {
+                throw new RuntimeException("리포지토리를 찾을 수 없습니다.");
+            }
+
+            GitHubRepository repository = repositoryOpt.get();
+            String[] repoInfo = parseRepositoryUrl(repository.getRepositoryUrl());
+            String owner = repoInfo[0];
+            String repo = repoInfo[1];
+
+            String response = webClient.get()
+                    .uri("/repos/{owner}/{repo}/branches", owner, repo)
+                    .header(HttpHeaders.AUTHORIZATION, "token " + repository.getAccessToken())
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+
+            JsonNode branchesNode = objectMapper.readTree(response);
+            List<Map<String, Object>> branches = new java.util.ArrayList<>();
+
+            for (JsonNode branchNode : branchesNode) {
+                Map<String, Object> branch = new java.util.HashMap<>();
+                branch.put("name", branchNode.get("name").asText());
+                branch.put("protected", branchNode.get("protected").asBoolean());
+
+                JsonNode commitNode = branchNode.get("commit");
+                branch.put("commit_sha", commitNode.get("sha").asText());
+                branch.put("commit_url", commitNode.get("url").asText());
+
+                branches.add(branch);
+            }
+
+            return branches;
+        } catch (Exception e) {
+            throw new RuntimeException("브랜치 정보를 가져오는 중 오류가 발생했습니다: " + e.getMessage());
+        }
+    }
+
+    /**
+     * GitHub API로 기여자 통계 조회
+     */
+    public List<Map<String, Object>> fetchRepositoryContributors(Long userId, Long repositoryId) {
+        try {
+            Optional<GitHubRepository> repositoryOpt = gitHubRepositoryRepository.findByUserIdAndRepositoryId(userId,
+                    repositoryId);
+            if (!repositoryOpt.isPresent()) {
+                throw new RuntimeException("리포지토리를 찾을 수 없습니다.");
+            }
+
+            GitHubRepository repository = repositoryOpt.get();
+            String[] repoInfo = parseRepositoryUrl(repository.getRepositoryUrl());
+            String owner = repoInfo[0];
+            String repo = repoInfo[1];
+
+            String response = webClient.get()
+                    .uri("/repos/{owner}/{repo}/contributors", owner, repo)
+                    .header(HttpHeaders.AUTHORIZATION, "token " + repository.getAccessToken())
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+
+            JsonNode contributorsNode = objectMapper.readTree(response);
+            List<Map<String, Object>> contributors = new java.util.ArrayList<>();
+
+            for (JsonNode contributorNode : contributorsNode) {
+                Map<String, Object> contributor = new java.util.HashMap<>();
+                contributor.put("login", contributorNode.get("login").asText());
+                contributor.put("avatar_url", contributorNode.get("avatar_url").asText());
+                contributor.put("html_url", contributorNode.get("html_url").asText());
+                contributor.put("contributions", contributorNode.get("contributions").asInt());
+                contributor.put("type", contributorNode.get("type").asText());
+
+                contributors.add(contributor);
+            }
+
+            return contributors;
+        } catch (Exception e) {
+            throw new RuntimeException("기여자 정보를 가져오는 중 오류가 발생했습니다: " + e.getMessage());
+        }
+    }
+
+    /**
+     * GitHub API로 언어 통계 조회
+     */
+    public Map<String, Object> fetchRepositoryLanguages(Long userId, Long repositoryId) {
+        try {
+            Optional<GitHubRepository> repositoryOpt = gitHubRepositoryRepository.findByUserIdAndRepositoryId(userId,
+                    repositoryId);
+            if (!repositoryOpt.isPresent()) {
+                throw new RuntimeException("리포지토리를 찾을 수 없습니다.");
+            }
+
+            GitHubRepository repository = repositoryOpt.get();
+            String[] repoInfo = parseRepositoryUrl(repository.getRepositoryUrl());
+            String owner = repoInfo[0];
+            String repo = repoInfo[1];
+
+            String response = webClient.get()
+                    .uri("/repos/{owner}/{repo}/languages", owner, repo)
+                    .header(HttpHeaders.AUTHORIZATION, "token " + repository.getAccessToken())
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+
+            JsonNode languagesNode = objectMapper.readTree(response);
+            Map<String, Object> languages = new java.util.HashMap<>();
+
+            long totalBytes = 0;
+            Map<String, Integer> languageBytes = new java.util.HashMap<>();
+
+            // 언어별 바이트 수 계산
+            languagesNode.fields().forEachRemaining(entry -> {
+                String language = entry.getKey();
+                int bytes = entry.getValue().asInt();
+                languageBytes.put(language, bytes);
+            });
+
+            totalBytes = languageBytes.values().stream().mapToLong(Integer::longValue).sum();
+
+            // 퍼센티지 계산
+            List<Map<String, Object>> languageStats = new java.util.ArrayList<>();
+            for (Map.Entry<String, Integer> entry : languageBytes.entrySet()) {
+                Map<String, Object> langStat = new java.util.HashMap<>();
+                langStat.put("language", entry.getKey());
+                langStat.put("bytes", entry.getValue());
+                langStat.put("percentage", totalBytes > 0 ? (entry.getValue() * 100.0 / totalBytes) : 0.0);
+                languageStats.add(langStat);
+            }
+
+            // 퍼센티지 순으로 정렬
+            languageStats.sort((a, b) -> Double.compare((Double) b.get("percentage"), (Double) a.get("percentage")));
+
+            languages.put("total_bytes", totalBytes);
+            languages.put("languages", languageStats);
+
+            return languages;
+        } catch (Exception e) {
+            throw new RuntimeException("언어 통계를 가져오는 중 오류가 발생했습니다: " + e.getMessage());
+        }
+    }
+
+    /**
+     * GitHub API로 Pull Request 정보 조회
+     */
+    public List<Map<String, Object>> fetchRepositoryPullRequests(Long userId, Long repositoryId) {
+        try {
+            Optional<GitHubRepository> repositoryOpt = gitHubRepositoryRepository.findByUserIdAndRepositoryId(userId,
+                    repositoryId);
+            if (!repositoryOpt.isPresent()) {
+                throw new RuntimeException("리포지토리를 찾을 수 없습니다.");
+            }
+
+            GitHubRepository repository = repositoryOpt.get();
+            String[] repoInfo = parseRepositoryUrl(repository.getRepositoryUrl());
+            String owner = repoInfo[0];
+            String repo = repoInfo[1];
+
+            // 최근 10개의 PR 조회 (열린 것과 닫힌 것 모두)
+            String response = webClient.get()
+                    .uri("/repos/{owner}/{repo}/pulls?state=all&per_page=10&sort=updated", owner, repo)
+                    .header(HttpHeaders.AUTHORIZATION, "token " + repository.getAccessToken())
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+
+            JsonNode pullsNode = objectMapper.readTree(response);
+            List<Map<String, Object>> pullRequests = new java.util.ArrayList<>();
+
+            for (JsonNode prNode : pullsNode) {
+                Map<String, Object> pr = new java.util.HashMap<>();
+                pr.put("number", prNode.get("number").asInt());
+                pr.put("title", prNode.get("title").asText());
+                pr.put("state", prNode.get("state").asText());
+                pr.put("html_url", prNode.get("html_url").asText());
+                pr.put("created_at", prNode.get("created_at").asText());
+                pr.put("updated_at", prNode.get("updated_at").asText());
+
+                // 작성자 정보
+                JsonNode userNode = prNode.get("user");
+                Map<String, Object> user = new java.util.HashMap<>();
+                user.put("login", userNode.get("login").asText());
+                user.put("avatar_url", userNode.get("avatar_url").asText());
+                pr.put("user", user);
+
+                // 브랜치 정보
+                pr.put("head_branch", prNode.get("head").get("ref").asText());
+                pr.put("base_branch", prNode.get("base").get("ref").asText());
+
+                pullRequests.add(pr);
+            }
+
+            return pullRequests;
+        } catch (Exception e) {
+            throw new RuntimeException("Pull Request 정보를 가져오는 중 오류가 발생했습니다: " + e.getMessage());
+        }
+    }
+
+    /**
+     * GitHub API로 Issue 정보 조회
+     */
+    public List<Map<String, Object>> fetchRepositoryIssues(Long userId, Long repositoryId) {
+        try {
+            Optional<GitHubRepository> repositoryOpt = gitHubRepositoryRepository.findByUserIdAndRepositoryId(userId,
+                    repositoryId);
+            if (!repositoryOpt.isPresent()) {
+                throw new RuntimeException("리포지토리를 찾을 수 없습니다.");
+            }
+
+            GitHubRepository repository = repositoryOpt.get();
+            String[] repoInfo = parseRepositoryUrl(repository.getRepositoryUrl());
+            String owner = repoInfo[0];
+            String repo = repoInfo[1];
+
+            // 최근 10개의 이슈 조회
+            String response = webClient.get()
+                    .uri("/repos/{owner}/{repo}/issues?state=all&per_page=10&sort=updated", owner, repo)
+                    .header(HttpHeaders.AUTHORIZATION, "token " + repository.getAccessToken())
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+
+            JsonNode issuesNode = objectMapper.readTree(response);
+            List<Map<String, Object>> issues = new java.util.ArrayList<>();
+
+            for (JsonNode issueNode : issuesNode) {
+                // Pull Request는 제외 (GitHub API에서 이슈로 포함됨)
+                if (issueNode.has("pull_request")) {
+                    continue;
+                }
+
+                Map<String, Object> issue = new java.util.HashMap<>();
+                issue.put("number", issueNode.get("number").asInt());
+                issue.put("title", issueNode.get("title").asText());
+                issue.put("state", issueNode.get("state").asText());
+                issue.put("html_url", issueNode.get("html_url").asText());
+                issue.put("created_at", issueNode.get("created_at").asText());
+                issue.put("updated_at", issueNode.get("updated_at").asText());
+
+                // 작성자 정보
+                JsonNode userNode = issueNode.get("user");
+                Map<String, Object> user = new java.util.HashMap<>();
+                user.put("login", userNode.get("login").asText());
+                user.put("avatar_url", userNode.get("avatar_url").asText());
+                issue.put("user", user);
+
+                // 라벨 정보
+                JsonNode labelsNode = issueNode.get("labels");
+                List<Map<String, Object>> labels = new java.util.ArrayList<>();
+                for (JsonNode labelNode : labelsNode) {
+                    Map<String, Object> label = new java.util.HashMap<>();
+                    label.put("name", labelNode.get("name").asText());
+                    label.put("color", labelNode.get("color").asText());
+                    labels.add(label);
+                }
+                issue.put("labels", labels);
+
+                issues.add(issue);
+            }
+
+            return issues;
+        } catch (Exception e) {
+            throw new RuntimeException("Issue 정보를 가져오는 중 오류가 발생했습니다: " + e.getMessage());
+        }
+    }
+
+    /**
+     * GitHub API로 릴리즈 정보 조회
+     */
+    public List<Map<String, Object>> fetchRepositoryReleases(Long userId, Long repositoryId) {
+        try {
+            Optional<GitHubRepository> repositoryOpt = gitHubRepositoryRepository.findByUserIdAndRepositoryId(userId,
+                    repositoryId);
+            if (!repositoryOpt.isPresent()) {
+                throw new RuntimeException("리포지토리를 찾을 수 없습니다.");
+            }
+
+            GitHubRepository repository = repositoryOpt.get();
+            String[] repoInfo = parseRepositoryUrl(repository.getRepositoryUrl());
+            String owner = repoInfo[0];
+            String repo = repoInfo[1];
+
+            String response = webClient.get()
+                    .uri("/repos/{owner}/{repo}/releases?per_page=5", owner, repo)
+                    .header(HttpHeaders.AUTHORIZATION, "token " + repository.getAccessToken())
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+
+            JsonNode releasesNode = objectMapper.readTree(response);
+            List<Map<String, Object>> releases = new java.util.ArrayList<>();
+
+            for (JsonNode releaseNode : releasesNode) {
+                Map<String, Object> release = new java.util.HashMap<>();
+                release.put("tag_name", releaseNode.get("tag_name").asText());
+                release.put("name", releaseNode.get("name").asText());
+                release.put("body", releaseNode.get("body").asText());
+                release.put("html_url", releaseNode.get("html_url").asText());
+                release.put("published_at", releaseNode.get("published_at").asText());
+                release.put("prerelease", releaseNode.get("prerelease").asBoolean());
+                release.put("draft", releaseNode.get("draft").asBoolean());
+
+                // 작성자 정보
+                JsonNode authorNode = releaseNode.get("author");
+                if (authorNode != null) {
+                    Map<String, Object> author = new java.util.HashMap<>();
+                    author.put("login", authorNode.get("login").asText());
+                    author.put("avatar_url", authorNode.get("avatar_url").asText());
+                    release.put("author", author);
+                }
+
+                releases.add(release);
+            }
+
+            return releases;
+        } catch (Exception e) {
+            throw new RuntimeException("릴리즈 정보를 가져오는 중 오류가 발생했습니다: " + e.getMessage());
         }
     }
 

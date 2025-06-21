@@ -47,7 +47,7 @@ public class GitLabManualSetupService {
 
             String response = webClient.get()
                     .uri("/user")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                    .header("Private-Token", token) // Personal Access Token용
                     .retrieve()
                     .bodyToMono(String.class)
                     .block();
@@ -56,6 +56,7 @@ public class GitLabManualSetupService {
             return responseJson.has("id");
 
         } catch (Exception e) {
+            System.err.println("GitLab 토큰 검증 실패: " + e.getMessage());
             return false;
         }
     }
@@ -71,7 +72,7 @@ public class GitLabManualSetupService {
 
             String response = webClient.get()
                     .uri("/user")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                    .header("Private-Token", token) // Personal Access Token용
                     .retrieve()
                     .bodyToMono(String.class)
                     .block();
