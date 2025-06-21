@@ -7,6 +7,7 @@ import com.assistivehub.integration.notion.service.NotionManualSetupService;
 import com.assistivehub.repository.NotionIntegrationRepository;
 import com.assistivehub.repository.GitHubIntegrationRepository;
 import com.assistivehub.repository.GitLabIntegrationRepository;
+import com.assistivehub.repository.GitHubRepositoryRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -31,6 +32,9 @@ public class IntegrationService {
 
     @Autowired
     private GitLabIntegrationRepository gitLabIntegrationRepository;
+
+    @Autowired
+    private GitHubRepositoryRepository gitHubRepositoryRepository;
 
     /**
      * 사용자의 모든 연동 서비스 조회
@@ -61,8 +65,10 @@ public class IntegrationService {
         long slackActiveCount = slackIntegrationService.countActiveUserSlackIntegrations(userId);
         long notionCount = notionIntegrationRepository.findByUserId(userId).size();
         long notionActiveCount = notionIntegrationRepository.findActiveByUserId(userId).size();
-        long githubCount = gitHubIntegrationRepository.findByUserId(userId).size();
-        long githubActiveCount = gitHubIntegrationRepository.findActiveByUserId(userId).size();
+        long githubCount = gitHubIntegrationRepository.findByUserId(userId).size() +
+                gitHubRepositoryRepository.findByUserId(userId).size();
+        long githubActiveCount = gitHubIntegrationRepository.findActiveByUserId(userId).size() +
+                gitHubRepositoryRepository.findActiveByUserId(userId).size();
         long gitlabCount = gitLabIntegrationRepository.findByUserId(userId).size();
         long gitlabActiveCount = gitLabIntegrationRepository.findActiveByUserId(userId).size();
 

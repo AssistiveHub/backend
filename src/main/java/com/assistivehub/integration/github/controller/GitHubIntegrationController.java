@@ -1,8 +1,10 @@
 package com.assistivehub.integration.github.controller;
 
 import com.assistivehub.integration.github.dto.GitHubManualSetupRequest;
+import com.assistivehub.integration.github.dto.GitHubIntegrationResponse;
 import com.assistivehub.integration.github.service.GitHubManualSetupService;
 import com.assistivehub.integration.github.service.GitHubOAuthService;
+import com.assistivehub.integration.github.service.GitHubIntegrationService;
 import com.assistivehub.entity.GitHubIntegration;
 import com.assistivehub.entity.User;
 import com.assistivehub.service.UserService;
@@ -28,6 +30,9 @@ public class GitHubIntegrationController {
 
     @Autowired
     private GitHubOAuthService gitHubOAuthService;
+
+    @Autowired
+    private GitHubIntegrationService gitHubIntegrationService;
 
     @Autowired
     private UserService userService;
@@ -110,10 +115,13 @@ public class GitHubIntegrationController {
             GitHubIntegration integration = gitHubOAuthService
                     .exchangeCodeForToken(user, code, redirectUri);
 
+            // Response DTO로 변환
+            GitHubIntegrationResponse response = GitHubIntegrationResponse.fromEntity(integration);
+
             Map<String, Object> result = new HashMap<>();
             result.put("success", true);
             result.put("message", "깃허브 OAuth 연동이 성공적으로 완료되었습니다.");
-            result.put("data", integration);
+            result.put("data", response);
 
             return ResponseEntity.ok(result);
 
@@ -130,21 +138,24 @@ public class GitHubIntegrationController {
      * 사용자의 모든 깃허브 연동 조회
      */
     @GetMapping
-    public ResponseEntity<Map<String, Object>> getGitHubIntegrations(
+    public ResponseEntity<Map<String, Object>> getUserGitHubIntegrations(
             @RequestParam(defaultValue = "false") boolean activeOnly,
             HttpServletRequest httpRequest) {
 
         try {
             Long userId = getCurrentUserId(httpRequest);
-            User user = userService.findById(userId);
+            List<GitHubIntegrationResponse> integrations;
 
-            List<GitHubIntegration> integrations = gitHubManualSetupService
-                    .getGitHubIntegrationsByUser(user, activeOnly);
+            if (activeOnly) {
+                integrations = gitHubIntegrationService.getActiveUserGitHubIntegrations(userId);
+            } else {
+                integrations = gitHubIntegrationService.getUserGitHubIntegrations(userId);
+            }
 
             Map<String, Object> result = new HashMap<>();
             result.put("success", true);
             result.put("data", integrations);
-            result.put("message", "깃허브 연동 목록을 성공적으로 조회했습니다.");
+            result.put("count", integrations.size());
 
             return ResponseEntity.ok(result);
 
@@ -167,14 +178,12 @@ public class GitHubIntegrationController {
 
         try {
             Long userId = getCurrentUserId(httpRequest);
-
-            GitHubIntegration integration = gitHubManualSetupService
-                    .getGitHubIntegrationById(userId, integrationId);
+            GitHubIntegrationResponse integration = gitHubIntegrationService
+                    .getGitHubIntegration(userId, integrationId);
 
             Map<String, Object> result = new HashMap<>();
             result.put("success", true);
             result.put("data", integration);
-            result.put("message", "깃허브 연동 정보를 성공적으로 조회했습니다.");
 
             return ResponseEntity.ok(result);
 
@@ -191,48 +200,17 @@ public class GitHubIntegrationController {
      * 깃허브 연동 해제
      */
     @DeleteMapping("/{integrationId}")
-    public ResponseEntity<Map<String, Object>> deleteGitHubIntegration(
+    public ResponseEntity<Map<String, Object>> disconnectGitHubIntegration(
             @PathVariable Long integrationId,
             HttpServletRequest httpRequest) {
 
         try {
             Long userId = getCurrentUserId(httpRequest);
-
-            gitHubOAuthService.revokeIntegration(userId, integrationId);
-
-            Map<String, Object> result = new HashMap<>();
-            result.put("success", true);
-            result.put("message", "깃허브 연동이 성공적으로 해제되었습니다.");
-
-            return ResponseEntity.ok(result);
-
-        } catch (Exception e) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", e.getMessage());
-
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
-        }
-    }
-
-    /**
-     * 깃허브 연동 활성화/비활성화 토글
-     */
-    @PatchMapping("/{integrationId}/toggle")
-    public ResponseEntity<Map<String, Object>> toggleGitHubIntegration(
-            @PathVariable Long integrationId,
-            HttpServletRequest httpRequest) {
-
-        try {
-            Long userId = getCurrentUserId(httpRequest);
-
-            GitHubIntegration integration = gitHubManualSetupService
-                    .toggleGitHubIntegration(userId, integrationId);
+            gitHubIntegrationService.disconnectGitHubIntegration(userId, integrationId);
 
             Map<String, Object> result = new HashMap<>();
             result.put("success", true);
-            result.put("data", integration);
-            result.put("message", "깃허브 연동 상태가 성공적으로 변경되었습니다.");
+            result.put("message", "깃허브 연동이 해제되었습니다.");
 
             return ResponseEntity.ok(result);
 
@@ -255,16 +233,67 @@ public class GitHubIntegrationController {
 
         try {
             Long userId = getCurrentUserId(httpRequest);
-
-            GitHubIntegration integration = gitHubManualSetupService
-                    .getGitHubIntegrationById(userId, integrationId);
-
-            boolean isValid = gitHubOAuthService.validateIntegration(integration);
+            boolean isValid = gitHubIntegrationService.validateGitHubIntegration(userId, integrationId);
 
             Map<String, Object> result = new HashMap<>();
             result.put("success", true);
-            result.put("valid", isValid);
-            result.put("message", isValid ? "깃허브 연동이 유효합니다." : "깃허브 연동이 유효하지 않습니다.");
+            result.put("isValid", isValid);
+            result.put("message", isValid ? "연동이 정상입니다." : "연동에 문제가 있습니다.");
+
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("message", e.getMessage());
+
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        }
+    }
+
+    /**
+     * 깃허브 연동 활성화/비활성화
+     */
+    @PatchMapping("/{integrationId}/toggle")
+    public ResponseEntity<Map<String, Object>> toggleGitHubIntegration(
+            @PathVariable Long integrationId,
+            HttpServletRequest httpRequest) {
+
+        try {
+            Long userId = getCurrentUserId(httpRequest);
+            GitHubIntegrationResponse integration = gitHubIntegrationService
+                    .toggleGitHubIntegration(userId, integrationId);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("message", integration.getIsActive() ? "연동이 활성화되었습니다." : "연동이 비활성화되었습니다.");
+            result.put("data", integration);
+
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("message", e.getMessage());
+
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        }
+    }
+
+    /**
+     * 깃허브 연동 통계
+     */
+    @GetMapping("/stats")
+    public ResponseEntity<Map<String, Object>> getGitHubIntegrationStats(HttpServletRequest httpRequest) {
+
+        try {
+            Long userId = getCurrentUserId(httpRequest);
+            GitHubIntegrationService.GitHubIntegrationStats stats = gitHubIntegrationService
+                    .getGitHubIntegrationStats(userId);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("data", stats);
 
             return ResponseEntity.ok(result);
 
@@ -292,10 +321,13 @@ public class GitHubIntegrationController {
             GitHubIntegration integration = gitHubManualSetupService
                     .createManualGitHubIntegration(user, request);
 
+            // Response DTO로 변환
+            GitHubIntegrationResponse response = GitHubIntegrationResponse.fromEntity(integration);
+
             Map<String, Object> result = new HashMap<>();
             result.put("success", true);
             result.put("message", "깃허브 연동이 성공적으로 완료되었습니다.");
-            result.put("data", integration);
+            result.put("data", response);
 
             return ResponseEntity.ok(result);
 
